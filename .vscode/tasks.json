@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup LeRobot (Docker + USB)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1"
+      },
+      "linux": {
+        "command": "bash docker/setup.sh"
+      },
+      "osx": {
+        "command": "bash docker/setup.sh"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true
+      }
+    },
+    {
+      "label": "Identify robot serial ports",
+      "type": "shell",
+      "command": "python src/lerobot/scripts/lerobot_setup_container.py --host-prep",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep"
+      },
+      "linux": {
+        "command": "bash docker/setup.sh --host-prep"
+      },
+      "osx": {
+        "command": "bash docker/setup.sh --host-prep"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true
+      }
+    }
+  ]
+}

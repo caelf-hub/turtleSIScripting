@@ -1,0 +1,21 @@
+name: lerobot
+
+# Used by VS Code / Cursor Dev Containers. USB serial adapters must already be
+# visible to the Docker Linux VM (on Windows: run `docker/setup.ps1` first).
+
+services:
+  lerobot:
+    image: ${LEROBOT_IMAGE:-huggingface/lerobot-cpu:latest}
+    privileged: true
+    group_add:
+      - dialout
+    stdin_open: true
+    tty: true
+    working_dir: /workspaces/lerobot
+    volumes:
+      - /dev:/dev
+      - ..:/workspaces/lerobot
+    environment:
+      LEROBOT_FOLLOWER_PORT: ${LEROBOT_FOLLOWER_PORT:-/dev/ttyACM0}
+      LEROBOT_LEADER_PORT: ${LEROBOT_LEADER_PORT:-/dev/ttyACM1}
+    command: /bin/bash
