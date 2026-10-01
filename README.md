@@ -23,14 +23,29 @@ Plug in **both** motor-bus USB cables. Power **both** arms. Use data cables, not
 
 ---
 
+## Start here (read this once)
+
+There are two different “setup” things in this repo. Use the **first**. Ignore the **second**.
+
+| | What it is | Do you run it? |
+| --- | --- | --- |
+| **Ctrl+Shift+B** | VS Code’s default **Build** task. In this folder that task **is** **Setup LeRobot (Docker + USB)**. It runs `docker/setup.ps1` on Windows: start Docker, share the two robot USB cables, write `.env`. | **Yes. This is step 1.** Same as **Terminal → Run Task → Setup LeRobot (Docker + USB)**. |
+| **`setup.py`** | Hugging Face’s old Python *package* installer (`pip install .`). It does **not** talk to Docker or USB. | **No.** Do not run `python setup.py` for the arms. |
+
+**Order:** Ctrl+Shift+B (while still on Windows) → **Dev Containers: Reopen in Container** → Find port / Calibrate / Teleoperate **inside** the green container.
+
+You are on Windows until the bottom-left corner says `Dev Container: LeRobot`. Find-port and teleop will fail if you skip Reopen in Container.
+
+---
+
 ## Path A — VS Code / Cursor (do this)
 
 Open **this folder** (the one that contains `src/` and `docker/`). When the editor offers **Install Recommended Extensions**, click Install.
 
 ### On the Windows PC (folder is local, not in Docker yet)
 
-1. **Terminal → Run Task… → Setup LeRobot (Docker + USB)**  
-   (or press **Ctrl+Shift+B**). Click **Yes** if Windows asks to share USB. Wait until you see `/dev/ttyACM0` and `/dev/ttyACM1`. That is not a freeze.
+1. Press **Ctrl+Shift+B** (or **Terminal → Run Task… → Setup LeRobot (Docker + USB)** — same command).  
+   Click **Yes** if Windows asks to share USB. Wait until you see `/dev/ttyACM0` and `/dev/ttyACM1`. That is not a freeze.
 2. **Command Palette** (`Ctrl+Shift+P`) → **Dev Containers: Reopen in Container**  
    Wait until the bottom-left corner says `Dev Container: LeRobot`. A welcome message lists serial devices.
 
@@ -104,6 +119,7 @@ On **macOS**, Docker cannot reliably see USB robot cables. Use Docker for traini
 | Offered **Reopen in WSL** | Skip it. For this repo use **Dev Containers: Reopen in Container**, not WSL. |
 | Bottom-left does **not** say `Dev Container: LeRobot` | You are still on Windows. Command Palette → **Dev Containers: Reopen in Container** before Find port / Calibrate / Teleoperate. |
 | Asking to **select a Python interpreter** | In the Dev Container pick `/lerobot/.venv/bin/python`. On Windows host, Setup only needs any Python 3.12+ on PATH. |
+| Unsure whether to run **`setup.py`** or **Ctrl+Shift+B** | **Ctrl+Shift+B**. `setup.py` only installs the Python library; it will not share USB into Docker. |
 
 ### Docker, USB, and the arms
 
