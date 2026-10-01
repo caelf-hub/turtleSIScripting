@@ -3,16 +3,45 @@
   "tasks": [
     {
       "label": "Setup LeRobot (Docker + USB)",
+      "detail": "HOST: start Docker, share both robot USB cables. Run this BEFORE Reopen in Container.",
       "type": "shell",
-      "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1",
+      "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep",
       "windows": {
-        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1"
+        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep"
       },
       "linux": {
-        "command": "bash docker/setup.sh"
+        "command": "if [ -f /.dockerenv ]; then echo 'You are inside the container. USB setup runs on the HOST.'; echo 'If ports are missing: Command Palette → Dev Containers: Reopen Folder Locally, then run this task.'; ls -l /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || true; else bash docker/setup.sh --host-prep; fi"
       },
       "osx": {
-        "command": "bash docker/setup.sh"
+        "command": "bash docker/setup.sh --host-prep"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Reattach robot USB to Docker",
+      "detail": "HOST: run this if /dev/ttyACM* disappeared after unplug.",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --reattach",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --reattach"
+      },
+      "linux": {
+        "command": "if [ -f /.dockerenv ]; then echo 'Reattach must run on the HOST, not in this container.'; echo 'Command Palette → Dev Containers: Reopen Folder Locally, then run this task.'; else bash docker/setup.sh --reattach; fi"
+      },
+      "osx": {
+        "command": "bash docker/setup.sh --reattach"
       },
       "options": {
         "cwd": "${workspaceFolder}"
@@ -20,22 +49,113 @@
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
-        "panel": "shared",
+        "panel": "dedicated",
         "focus": true
       }
     },
     {
-      "label": "Identify robot serial ports",
+      "label": "Find port and save as follower",
+      "detail": "IN CONTAINER: unplug the FOLLOWER arm when asked.",
       "type": "shell",
-      "command": "python src/lerobot/scripts/lerobot_setup_container.py --host-prep",
+      "command": "sh docker/vscode-robot.sh find-follower",
       "windows": {
-        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep"
+        "command": "Write-Host 'Open the Dev Container first: Command Palette → Dev Containers: Reopen in Container'"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Find port and save as leader",
+      "detail": "IN CONTAINER: unplug the LEADER arm when asked.",
+      "type": "shell",
+      "command": "sh docker/vscode-robot.sh find-leader",
+      "windows": {
+        "command": "Write-Host 'Open the Dev Container first: Command Palette → Dev Containers: Reopen in Container'"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Calibrate follower",
+      "detail": "IN CONTAINER: center the follower, then sweep joints.",
+      "type": "shell",
+      "command": "sh docker/vscode-robot.sh calibrate-follower",
+      "windows": {
+        "command": "Write-Host 'Open the Dev Container first: Command Palette → Dev Containers: Reopen in Container'"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Calibrate leader",
+      "detail": "IN CONTAINER: center the leader, then sweep joints.",
+      "type": "shell",
+      "command": "sh docker/vscode-robot.sh calibrate-leader",
+      "windows": {
+        "command": "Write-Host 'Open the Dev Container first: Command Palette → Dev Containers: Reopen in Container'"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Teleoperate",
+      "detail": "IN CONTAINER: follower copies the leader. Ctrl+C to stop. No GUI in Docker.",
+      "type": "shell",
+      "command": "sh docker/vscode-robot.sh teleoperate",
+      "windows": {
+        "command": "Write-Host 'Open the Dev Container first: Command Palette → Dev Containers: Reopen in Container'"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      }
+    },
+    {
+      "label": "Show robot commands",
+      "detail": "Print calibrate/teleoperate commands using ports from .env.",
+      "type": "shell",
+      "command": "python src/lerobot/scripts/lerobot_setup_container.py --print-commands",
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --print-commands"
       },
       "linux": {
-        "command": "bash docker/setup.sh --host-prep"
+        "command": "python3 src/lerobot/scripts/lerobot_setup_container.py --print-commands || python src/lerobot/scripts/lerobot_setup_container.py --print-commands"
       },
       "osx": {
-        "command": "bash docker/setup.sh --host-prep"
+        "command": "python3 src/lerobot/scripts/lerobot_setup_container.py --print-commands"
       },
       "options": {
         "cwd": "${workspaceFolder}"

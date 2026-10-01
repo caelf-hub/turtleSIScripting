@@ -88,16 +88,19 @@ celerybeat-schedule
 celerybeat.pid
 
 ### IDE & Editor Config ###
-# VS Code user settings (keep local)
+# VS Code user settings (keep local). Shared workspace files are committed.
 .vscode/*
 !.vscode/extensions.json
 !.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
 
 # Dev Container: commit the shared config, ignore machine-specific USB cache
 .devcontainer/usb-ports.json
 
 # Machine-specific USB bind cache (written by lerobot-setup-container)
 docker/.usb-ports.json
+docker/.env
 
 # JetBrains / PyCharm
 .idea/

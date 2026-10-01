@@ -1,0 +1,7 @@
+{
+  "python.envFile": "${workspaceFolder}/.env",
+  "python.analysis.extraPaths": ["src"],
+  "python.terminal.activateEnvironment": true,
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "task.quickOpen.detail": true
+}

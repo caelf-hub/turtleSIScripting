@@ -125,10 +125,11 @@ class SOLeader(Teleoperator):
         print(f"Calibration saved to {self.calibration_fpath}")
 
     def configure(self) -> None:
-        self.bus.disable_torque()
+        retries = self.config.num_read_retries
+        self.bus.disable_torque(num_retry=retries)
         self.bus.configure_motors()
         for motor in self.bus.motors:
-            self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+            self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value, num_retry=retries)
 
     def enable_torque(self) -> None:
         self.bus.enable_torque()

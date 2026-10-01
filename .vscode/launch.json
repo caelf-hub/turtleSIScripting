@@ -1,0 +1,99 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "LeRobot: Find port (follower)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lerobot.scripts.lerobot_find_port",
+      "args": ["--save", "follower"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "LeRobot: Find port (leader)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lerobot.scripts.lerobot_find_port",
+      "args": ["--save", "leader"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "LeRobot: Calibrate follower",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lerobot.scripts.lerobot_calibrate",
+      "args": [
+        "--robot.type=so101_follower",
+        "--robot.port=${input:followerPort}",
+        "--robot.id=my_follower"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "LeRobot: Calibrate leader",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lerobot.scripts.lerobot_calibrate",
+      "args": [
+        "--teleop.type=so101_leader",
+        "--teleop.port=${input:leaderPort}",
+        "--teleop.id=my_leader"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "LeRobot: Teleoperate",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lerobot.scripts.lerobot_teleoperate",
+      "args": [
+        "--robot.type=so101_follower",
+        "--robot.port=${input:followerPort}",
+        "--robot.id=my_follower",
+        "--teleop.type=so101_leader",
+        "--teleop.port=${input:leaderPort}",
+        "--teleop.id=my_leader"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "followerPort",
+      "type": "promptString",
+      "description": "Follower serial port (from lerobot-find-port --save follower)",
+      "default": "/dev/ttyACM0"
+    },
+    {
+      "id": "leaderPort",
+      "type": "promptString",
+      "description": "Leader serial port (from lerobot-find-port --save leader)",
+      "default": "/dev/ttyACM1"
+    }
+  ]
+}

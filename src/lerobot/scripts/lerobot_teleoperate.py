@@ -123,6 +123,7 @@ from lerobot.teleoperators import (  # noqa: F401
 )
 from lerobot.utils.cycle_timer import CycleTimer
 from lerobot.utils.import_utils import register_third_party_plugins
+from lerobot.utils.keyboard_input import is_headless
 from lerobot.utils.utils import init_logging, move_cursor_up
 from lerobot.utils.visualization_utils import (
     init_visualization,
@@ -253,6 +254,12 @@ def teleop_loop(
 def teleoperate(cfg: TeleoperateConfig):
     init_logging()
     logging.info(pformat(asdict(cfg)))
+    if cfg.display_data and cfg.display_mode == "rerun" and is_headless() and not cfg.display_ip:
+        logging.warning(
+            "No graphical display in this environment (Docker/headless). Skipping the Rerun window. "
+            "Teleop still works. Re-run with --display_data=false, or stream to a host viewer with --display_ip."
+        )
+        cfg.display_data = False
     if cfg.display_data:
         init_visualization(
             cfg.display_mode, session_name="teleoperation", ip=cfg.display_ip, port=cfg.display_port

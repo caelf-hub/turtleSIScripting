@@ -73,7 +73,7 @@ NOISE_RE = re.compile(
     re.I,
 )
 SERIAL_RE = re.compile(
-    r"serial|uart|ch340|ch341|cp210|ftdi|cdc|acm|usb-serial|usb serial|\bcom\d+\b",
+    r"serial|uart|ch340|ch341|ch343|cp210|ftdi|cdc|acm|usb-serial|usb serial|\bcom\d+\b",
     re.I,
 )
 
@@ -120,7 +120,7 @@ def pause(message: str, *, assume_yes: bool) -> None:
     if assume_yes:
         say(message)
         return
-    input(f"{message}  Press Enter to continue...")
+    input(f"{message}  This is not frozen. Press Enter to continue...")
 
 
 def which(name: str) -> str | None:
@@ -163,6 +163,13 @@ def running_in_wsl() -> bool:
     except OSError:
         return False
     return "microsoft" in text or "wsl" in text
+
+
+def running_in_container() -> bool:
+    """True inside Docker / Dev Containers (USB setup must run on the host)."""
+    if Path("/.dockerenv").exists():
+        return True
+    return os.environ.get("REMOTE_CONTAINERS") == "true" or os.environ.get("CODESPACES") == "true"
 
 
 def parse_vid_pid(instance_id: str) -> str:
@@ -392,21 +399,74 @@ def usbipd_bind_and_attach(device: UsbDevice) -> bool:
         if elevated.returncode != 0:
             say(bind.stderr.strip() if bind.stderr else "usbipd bind failed.")
             return False
-    attach = run(
-        [binary, "attach", "--wsl", WSL_DISTRO, "--busid", device.busid, "--auto-attach"],
-        check=False,
-    )
-    if attach.returncode != 0:
-        say(attach.stderr.strip() if attach.stderr else f"usbipd attach failed for {device.busid}.")
+    start_usbipd_auto_attach(binary, device.busid)
+    if not wait_until_usb_attached(device.busid, timeout_s=25):
+        say(f"Timed out waiting for {device.busid} to attach to Docker.")
         return False
     say(f"Shared {device.busid} ({device.description}) into Docker.")
     return True
 
 
-def list_docker_vm_serial_ports() -> None:
+def start_usbipd_auto_attach(binary: str, busid: str) -> None:
+    """Watch for unplug/replug without blocking this script.
+
+    `usbipd attach --auto-attach` stays running. Waiting on it looks like a freeze.
+    """
+    flags = 0
+    if is_windows():
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "DETACHED_PROCESS", 0)
+    try:
+        subprocess.Popen(  # nosec B603
+            [binary, "attach", "--wsl", WSL_DISTRO, "--busid", busid, "--auto-attach"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=flags,
+            start_new_session=not is_windows(),
+        )
+    except OSError as exc:
+        say(f"Could not start usbipd auto-attach for {busid}: {exc}")
+
+
+def wait_until_usb_attached(busid: str, *, timeout_s: float) -> bool:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        for device in list_usbipd_devices():
+            if device.busid == busid and device.attached:
+                return True
+        time.sleep(0.5)
+    return False
+
+
+def bind_wsl_ch343_serial() -> None:
+    """Docker Desktop often attaches CH343 (1a86:55d3) as USB but not as ttyACM.
+
+    Bind cdc_acm and make the nodes world-accessible so the container can open them.
+    """
     wsl = which("wsl")
     if wsl is None:
         return
+    run(
+        [
+            wsl,
+            "-d",
+            WSL_DISTRO,
+            "-e",
+            "sh",
+            "-c",
+            "modprobe cdc-acm 2>/dev/null; "
+            "echo '1a86 55d3' > /sys/bus/usb/drivers/cdc_acm/new_id 2>/dev/null; "
+            "echo '1a86 7523' > /sys/bus/usb/drivers/cdc_acm/new_id 2>/dev/null; "
+            "sleep 1; chmod 666 /dev/ttyACM* /dev/ttyUSB* 2>/dev/null; true",
+        ],
+        check=False,
+    )
+
+
+def list_wsl_tty_nodes() -> list[str]:
+    wsl = which("wsl")
+    if wsl is None:
+        return []
     result = run(
         [
             wsl,
@@ -415,16 +475,34 @@ def list_docker_vm_serial_ports() -> None:
             "-e",
             "sh",
             "-c",
-            "ls -l /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id 2>/dev/null",
+            "ls -1 /dev/ttyACM* /dev/ttyUSB* 2>/dev/null",
         ],
         check=False,
     )
-    output = (result.stdout or "").strip()
-    if output:
+    return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+
+
+def wait_for_wsl_serial_nodes(*, minimum: int = 2, timeout_s: float = 20) -> list[str]:
+    deadline = time.time() + timeout_s
+    nodes: list[str] = []
+    while time.time() < deadline:
+        bind_wsl_ch343_serial()
+        nodes = list_wsl_tty_nodes()
+        if len(nodes) >= minimum:
+            return nodes
+        time.sleep(1)
+    return nodes
+
+
+def list_docker_vm_serial_ports() -> None:
+    nodes = wait_for_wsl_serial_nodes(minimum=1, timeout_s=12)
+    if nodes:
         say("Serial devices inside Docker's Linux VM:")
-        say(output)
+        for node in nodes:
+            say(f"  {node}")
     else:
-        say("No /dev/ttyACM* yet in Docker's VM. Unplug/replug the robot cables and re-run if needed.")
+        say("No /dev/ttyACM* yet in Docker's VM. Plug both cables in and re-run:")
+        say("  powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --reattach")
 
 
 def save_usb_cache(root: Path, devices: list[UsbDevice]) -> None:
@@ -566,22 +644,72 @@ def setup_macos_usb() -> None:
             say(f"  {port}")
 
 
-def write_env_file(root: Path, *, image: str, follower: str, leader: str) -> Path:
-    path = root / ".env"
-    existing: dict[str, str] = {}
-    if path.is_file():
+def read_env_file(root: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for path in (root / ".env", root / "docker" / ".env"):
+        if not path.is_file():
+            continue
         for line in path.read_text(encoding="utf-8").splitlines():
             if "=" in line and not line.lstrip().startswith("#"):
                 key, value = line.split("=", 1)
-                existing[key.strip()] = value.strip()
+                values[key.strip()] = value.strip()
+    return values
+
+
+def dump_env_files(root: Path, values: dict[str, str]) -> Path:
+    """Write repo-root `.env` and `docker/.env` (Compose interpolates the latter)."""
+    lines = ["# Written by lerobot-setup-container. Safe to edit."]
+    for key, value in values.items():
+        lines.append(f"{key}={value}")
+    text = "\n".join(lines) + "\n"
+    path = root / ".env"
+    path.write_text(text, encoding="utf-8")
+    docker_dir = root / "docker"
+    docker_dir.mkdir(parents=True, exist_ok=True)
+    (docker_dir / ".env").write_text(text, encoding="utf-8")
+    return path
+
+
+def write_env_file(root: Path, *, image: str, follower: str, leader: str) -> Path:
+    existing = read_env_file(root)
     existing["LEROBOT_IMAGE"] = image
     existing["LEROBOT_FOLLOWER_PORT"] = follower
     existing["LEROBOT_LEADER_PORT"] = leader
-    lines = ["# Written by lerobot-setup-container. Safe to edit."]
-    for key, value in existing.items():
-        lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return path
+    return dump_env_files(root, existing)
+
+
+def update_env_port(root: Path, role: str, port: str) -> Path:
+    """Save a find-port result as follower or leader (used by calibrate/teleop tasks)."""
+    if role not in {"follower", "leader"}:
+        raise ValueError(f"role must be 'follower' or 'leader', got {role!r}")
+    existing = read_env_file(root)
+    key = "LEROBOT_FOLLOWER_PORT" if role == "follower" else "LEROBOT_LEADER_PORT"
+    existing.setdefault("LEROBOT_IMAGE", CPU_IMAGE)
+    existing.setdefault("LEROBOT_FOLLOWER_PORT", "/dev/ttyACM0")
+    existing.setdefault("LEROBOT_LEADER_PORT", "/dev/ttyACM1")
+    existing[key] = port
+    return dump_env_files(root, existing)
+
+
+def print_copy_paste_commands(root: Path) -> None:
+    env = read_env_file(root)
+    follower = env.get("LEROBOT_FOLLOWER_PORT", "/dev/ttyACM0")
+    leader = env.get("LEROBOT_LEADER_PORT", "/dev/ttyACM1")
+    say("")
+    say("Copy-paste (ports come from .env after find-port --save):")
+    say(
+        "  lerobot-calibrate "
+        f"--robot.type=so101_follower --robot.port={follower} --robot.id=my_follower"
+    )
+    say(
+        "  lerobot-calibrate "
+        f"--teleop.type=so101_leader --teleop.port={leader} --teleop.id=my_leader"
+    )
+    say(
+        "  lerobot-teleoperate "
+        f"--robot.type=so101_follower --robot.port={follower} --robot.id=my_follower "
+        f"--teleop.type=so101_leader --teleop.port={leader} --teleop.id=my_leader"
+    )
 
 
 def container_serial_guess(host_ports: list[str]) -> tuple[str, str]:
@@ -624,6 +752,8 @@ def start_container(root: Path, image: str, *, gpu: bool) -> int:
         f"{root}:/workspaces/lerobot",
         "-w",
         "/workspaces/lerobot",
+        "-e",
+        "PYTHONPATH=/workspaces/lerobot/src",
         "--env-file",
         str(root / ".env"),
     ]
@@ -636,13 +766,18 @@ def start_container(root: Path, image: str, *, gpu: bool) -> int:
 
 def print_next_steps(*, in_container: bool) -> None:
     say("")
-    say("When the robot USB cables are connected, inside the container run:")
-    say("  ls -l /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id")
-    say("  lerobot-find-port")
-    say("Unplug ONE arm when asked so you know which path is leader vs follower.")
+    say("Keep BOTH USB cables plugged in unless find-port asks you to unplug one.")
+    say("Inside the container (or VS Code / Cursor after Reopen in Container):")
+    say("  ls -l /dev/ttyACM*")
+    say("  lerobot-find-port --save follower    # unplug the FOLLOWER arm when asked")
+    say("  lerobot-find-port --save leader      # unplug the LEADER arm when asked")
+    say("Then: Terminal → Run Task → Calibrate follower / Calibrate leader / Teleoperate")
+    say("If /dev/ttyACM* vanishes after unplug, on the Windows HOST (not in Docker) run:")
+    say("  powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --reattach")
+    say("  Terminal → Run Task → Reattach robot USB to Docker")
     if not in_container:
         say("")
-        say("Or in VS Code / Cursor: Dev Containers: Reopen in Container")
+        say("VS Code / Cursor: Command Palette → Dev Containers: Reopen in Container")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -665,18 +800,50 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gpu", action="store_true", help="Force the NVIDIA GPU image.")
     parser.add_argument("--skip-usb", action="store_true", help="Skip USB bind/detect.")
     parser.add_argument(
+        "--reattach",
+        action="store_true",
+        help="Re-share USB serial adapters into Docker after unplug (does not start a container).",
+    )
+    parser.add_argument(
         "--skip-docker",
         action="store_true",
         help="Skip Docker checks (USB only).",
+    )
+    parser.add_argument(
+        "--print-commands",
+        action="store_true",
+        help="Print calibrate/teleoperate commands from .env and exit.",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    assume_yes = bool(args.yes or args.host_prep)
-    host_prep_only = bool(args.host_prep or args.no_run)
+    host_prep_only = bool(args.host_prep or args.no_run or args.reattach)
+    assume_yes = bool(args.yes or host_prep_only)
+    if args.reattach:
+        args.skip_usb = False
     root = repo_root()
+
+    if args.print_commands:
+        print_copy_paste_commands(root)
+        return 0
+
+    if running_in_container():
+        step("You are already inside the container")
+        say("USB sharing happens on the HOST computer, not here.")
+        say("VS Code / Cursor on Windows: Terminal → Run Task → Setup LeRobot (Docker + USB)")
+        say("or on the host:  powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --reattach")
+        ports = list_host_serial_ports()
+        if ports:
+            say("Serial ports this container can see:")
+            for port in ports:
+                say(f"  {port}")
+        else:
+            say("No /dev/ttyACM* here. Reattach USB on the host, then reopen the container.")
+        print_next_steps(in_container=True)
+        print_copy_paste_commands(root)
+        return 0
 
     say("LeRobot Docker + robot USB setup")
     say("I will check this computer and tell you if something is missing.")
@@ -707,13 +874,14 @@ def main(argv: list[str] | None = None) -> int:
 
     follower, leader = container_serial_guess(host_ports)
     env_path = write_env_file(root, image=image, follower=follower, leader=leader)
-    say(f"Wrote {env_path}")
+    say(f"Wrote {env_path} and {root / 'docker' / '.env'}")
     say(f"  LEROBOT_FOLLOWER_PORT={follower}")
     say(f"  LEROBOT_LEADER_PORT={leader}")
-    say("These are guesses until you run lerobot-find-port.")
+    say("These are guesses until you run lerobot-find-port --save follower/leader.")
 
     if host_prep_only or args.skip_docker:
         print_next_steps(in_container=False)
+        print_copy_paste_commands(root)
         return 0
 
     if not docker_ok:

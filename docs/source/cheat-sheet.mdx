@@ -30,10 +30,11 @@ bash docker/setup.sh
 
 ###### Find port
 
-Use this to identify which serial ports your robots are connected to. Follow the instructions in your terminal: you will be asked to unplug the USB cable and press Enter. The script will then detect and print the correct serial port for that robot.
+Use this to identify which serial ports your robots are connected to. You will be asked to unplug one USB cable. `--save` writes the path into `.env` so VS Code tasks can use it.
 
 ```bash
-lerobot-find-port
+lerobot-find-port --save follower
+lerobot-find-port --save leader
 ```
 
 ###### Find cameras

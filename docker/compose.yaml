@@ -1,7 +1,8 @@
 name: lerobot
 
-# Used by VS Code / Cursor Dev Containers. USB serial adapters must already be
-# visible to the Docker Linux VM (on Windows: run `docker/setup.ps1` first).
+# Used by VS Code / Cursor Dev Containers.
+# On Windows run Terminal → Run Task → Setup LeRobot (Docker + USB) first so
+# usbipd has attached both adapters and docker/.env exists for interpolation.
 
 services:
   lerobot:
@@ -18,4 +19,8 @@ services:
     environment:
       LEROBOT_FOLLOWER_PORT: ${LEROBOT_FOLLOWER_PORT:-/dev/ttyACM0}
       LEROBOT_LEADER_PORT: ${LEROBOT_LEADER_PORT:-/dev/ttyACM1}
+      PYTHONPATH: /workspaces/lerobot/src
+    env_file:
+      - path: .env
+        required: false
     command: /bin/bash

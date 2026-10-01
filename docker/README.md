@@ -2,46 +2,56 @@
 
 This directory contains Dockerfiles for running LeRobot in containerized environments. Both images are **built nightly from `main`** and published to Docker Hub with the full environment pre-baked — no dependency setup required.
 
+## VS Code / Cursor (recommended)
+
+The click-by-click path is in the [root README](../README.md): **Setup task → Reopen in Container → Find port → Calibrate → Teleoperate**.
+
+That uses [`compose.yaml`](./compose.yaml) and [`.devcontainer/devcontainer.json`](../.devcontainer/devcontainer.json). USB must be attached on the **host** first (`setup.ps1 --host-prep`). If you run setup inside the container, it will tell you to go back to the host.
+
+When the container starts, [`container-welcome.sh`](./container-welcome.sh) prints the next clicks.
+
 ## One command (robots + Docker)
 
-From the repo root. The script checks Docker, finds USB serial adapters, shares them into Docker on Windows, and starts the container. It prints the next step if something is missing.
+From the repo root. The script checks Docker, finds USB serial adapters, shares them into Docker on Windows, and (unless you pass `--host-prep`) can start a shell. It prints the next step if something is missing.
 
 ```powershell
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File docker/setup.ps1
+# Windows (PowerShell) — USB + image, then you can Reopen in Container
+powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep
 ```
 
 ```bash
 # Linux / macOS
-bash docker/setup.sh
+bash docker/setup.sh --host-prep
 ```
 
 Same thing after `uv sync`:
 
 ```bash
-lerobot-setup-container
+lerobot-setup-container --host-prep
 ```
 
 Useful flags:
 
 ```bash
 lerobot-setup-container --host-prep   # Docker + USB only, do not start a shell
+lerobot-setup-container --reattach    # after unplug: share USB + create ttyACM nodes again
+lerobot-setup-container --print-commands
 lerobot-setup-container --cpu         # force CPU image
 lerobot-setup-container --gpu         # force NVIDIA GPU image
 lerobot-setup-container -y            # no questions, keep going
 ```
 
-On Windows, plug in both motor-bus USB cables first. The first USB share may show a permission popup — click Yes. On macOS, Docker cannot reliably see USB robot cables; use Docker for training and run LeRobot on the Mac itself for the real robot.
+On Windows, plug in both motor-bus USB cables first. The first USB share may show a permission popup — click Yes. The script binds QinHeng CH343 chips to `cdc_acm` so `/dev/ttyACM*` actually appears. If a port disappears after unplug, run `docker/setup.ps1 --reattach` on the host (VS Code task: **Reattach robot USB to Docker**).
 
 Then, inside the container:
 
 ```bash
-lerobot-find-port
+ls -l /dev/ttyACM*
+lerobot-find-port --save follower
+lerobot-find-port --save leader
 ```
 
-Unplug one arm when asked so you know which path is leader vs follower.
-
-VS Code / Cursor: after the setup script has run once, use **Dev Containers: Reopen in Container**.
+Unplug one arm when asked so you know which path is leader vs follower. Plug it back in before calibrate. Do not leave a cable unplugged.
 
 ## Pre-built Images
 

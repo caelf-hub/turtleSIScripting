@@ -77,7 +77,7 @@ hf auth login                             # required to push datasets/policies
 
 **4.2 Find USB ports** — run once per arm, unplug when prompted.
 
-If you are using Docker (especially on Windows), run this first so both cables are visible inside the container:
+If you are using Docker on Windows, the click-by-click path is in [`README.md`](./README.md) (Setup task → Reopen in Container → Find port / Calibrate / Teleoperate). USB setup is **host-only**.
 
 ```bash
 # Windows:  powershell -ExecutionPolicy Bypass -File docker/setup.ps1 --host-prep
@@ -85,10 +85,11 @@ If you are using Docker (especially on Windows), run this first so both cables a
 lerobot-setup-container --host-prep
 ```
 
-Then:
+Then inside the container:
 
 ```bash
-lerobot-find-port
+lerobot-find-port --save follower
+lerobot-find-port --save leader
 ```
 
 macOS: `/dev/tty.usbmodem...`; Linux: `/dev/ttyACM0` (may need `sudo chmod 666 /dev/ttyACM0`).
@@ -116,6 +117,8 @@ lerobot-teleoperate \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
   --display_data=true
 ```
+
+Inside Docker / VS Code Dev Containers there is no graphical display. Use **Terminal → Run Task → Teleoperate**, or drop `--display_data=true`. `--display_data=true` needs a host GUI, or `--display_ip` to a Rerun viewer on the host.
 
 > **Feetech timeout / comms error on SO-100 / SO-101?** Before touching software, check the **red motor LEDs** on the daisy chain.
 >

@@ -157,18 +157,19 @@ class SOFollower(Robot):
         print("Calibration saved to", self.calibration_fpath)
 
     def configure(self) -> None:
+        retries = self.config.num_read_retries
         with self.bus.torque_disabled():
             self.bus.configure_motors()
             for motor in self.bus.motors:
-                self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
-                self.bus.write("P_Coefficient", motor, self.config.position_p_coefficient)
-                self.bus.write("I_Coefficient", motor, self.config.position_i_coefficient)
-                self.bus.write("D_Coefficient", motor, self.config.position_d_coefficient)
+                self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value, num_retry=retries)
+                self.bus.write("P_Coefficient", motor, self.config.position_p_coefficient, num_retry=retries)
+                self.bus.write("I_Coefficient", motor, self.config.position_i_coefficient, num_retry=retries)
+                self.bus.write("D_Coefficient", motor, self.config.position_d_coefficient, num_retry=retries)
 
                 if motor == "gripper":
-                    self.bus.write("Max_Torque_Limit", motor, 500)  # 50% of max torque to avoid burnout
-                    self.bus.write("Protection_Current", motor, 250)  # 50% of max current to avoid burnout
-                    self.bus.write("Overload_Torque", motor, 25)  # 25% torque when overloaded
+                    self.bus.write("Max_Torque_Limit", motor, 500, num_retry=retries)  # 50% of max torque
+                    self.bus.write("Protection_Current", motor, 250, num_retry=retries)  # 50% of max current
+                    self.bus.write("Overload_Torque", motor, 25, num_retry=retries)  # 25% torque when overloaded
 
     def setup_motors(self) -> None:
         for motor in reversed(self.bus.motors):

@@ -1,111 +1,146 @@
 # turtleSIScripting (LeRobot fork)
 
-**This repository is not original work from scratch.** Almost all of the code here was written by the [Hugging Face LeRobot](https://github.com/huggingface/lerobot) developers and contributors. Credit for the library, policies, datasets, robot drivers, and documentation belongs to them.
+**This is not original work from scratch.** Almost all of the code was written by the [Hugging Face LeRobot](https://github.com/huggingface/lerobot) team. Credit for the library, robots, and docs belongs to them.
 
-This GitHub copy exists so I can keep a small set of **setup edits** on top of that project: a one-command path to build/start a Docker container and get **two robot USB serial ports** into that container (leader + follower). If something works because of LeRobot, thank the original authors. If the auto-setup helps you plug arms into Docker, that part is the local overlay.
+This copy adds a **one-command Docker + USB path** so two SO-101 arms (leader + follower) show up inside VS Code / Cursor on Windows. If the robot learns, thank Hugging Face. If the cables show up in Docker, that part is this overlay.
 
-- Original project: [huggingface/lerobot](https://github.com/huggingface/lerobot)
-- License: [Apache 2.0](./LICENSE) (same as upstream)
-- Docs from the original team: [huggingface.co/docs/lerobot](https://huggingface.co/docs/lerobot)
-
----
-
-## What this fork adds
-
-Upstream LeRobot already runs in Docker. On Windows, USB motor-bus adapters (COM ports) do **not** automatically appear inside Docker Desktop’s Linux VM. These edits walk you through that:
-
-1. Check that Docker is installed and running (start Docker Desktop if needed).
-2. Look for robot serial adapters (CH340 / CP210 / FTDI, etc.) and ignore mice, keyboards, webcams.
-3. On Windows, share those USB devices into Docker with `usbipd`.
-4. Write `.env` with `LEROBOT_FOLLOWER_PORT` and `LEROBOT_LEADER_PORT`.
-5. Pull the LeRobot image and start a container that mounts `/dev` so both ports are visible.
-
-You do **not** need to memorize docker flags. Run the one command below. If something is missing (Python, Docker, cables, admin permission), the script prints what to do next instead of failing silently.
+- Upstream: [huggingface/lerobot](https://github.com/huggingface/lerobot)
+- License: [Apache 2.0](./LICENSE)
+- Robot docs: [SO-101](https://huggingface.co/docs/lerobot/so101)
 
 ---
 
-## One command: Docker + robot ports
+## What you install once
 
-From the **repo root** (the folder that contains `src/` and `docker/`).
+Do these on the **Windows PC** (not inside Docker):
 
-### Windows (PowerShell)
+1. [Docker Desktop](https://docs.docker.com/get-docker/) — start it and wait until it says **Running**
+2. [Python 3.12+](https://www.python.org/downloads/windows/) — check **Add python.exe to PATH**
+3. [usbipd-win](https://github.com/dorssel/usbipd-win/releases) — `winget install usbipd`
+4. [VS Code](https://code.visualstudio.com/) or [Cursor](https://cursor.com/), then install the **Dev Containers** extension when the editor asks
+
+Plug in **both** motor-bus USB cables. Power **both** arms. Use data cables, not charge-only.
+
+---
+
+## Path A — VS Code / Cursor (do this)
+
+Open **this folder** (the one that contains `src/` and `docker/`). When the editor offers **Install Recommended Extensions**, click Install.
+
+### On the Windows PC (folder is local, not in Docker yet)
+
+1. **Terminal → Run Task… → Setup LeRobot (Docker + USB)**  
+   (or press **Ctrl+Shift+B**). Click **Yes** if Windows asks to share USB. Wait until you see `/dev/ttyACM0` and `/dev/ttyACM1`. That is not a freeze.
+2. **Command Palette** (`Ctrl+Shift+P`) → **Dev Containers: Reopen in Container**  
+   Wait until the bottom-left corner says `Dev Container: LeRobot`. A welcome message lists serial devices.
+
+If it says **none yet**, stay calm: **Command Palette → Dev Containers: Reopen Folder Locally**, run **Reattach robot USB to Docker**, then **Reopen in Container** again.
+
+### Inside the container (green / Dev Container window)
+
+Run these **in order**. Unplug a cable **only** when the task tells you to. Plug it back in before the next step.
+
+| Order | Terminal → Run Task… | What you do |
+| --- | --- | --- |
+| 3 | **Find port and save as follower** | Unplug the **follower** USB, Enter, plug it back in |
+| 4 | **Find port and save as leader** | Unplug the **leader** USB, Enter, plug it back in |
+| 5 | **Calibrate follower** | Center the arm, Enter, sweep joints |
+| 6 | **Calibrate leader** | Same for the leader |
+| 7 | **Teleoperate** | Move the leader. The follower should copy it. **Ctrl+C** stops |
+
+You can also press **F5** and pick `LeRobot: Teleoperate` (same thing, with a debugger).
+
+Docker has **no robot window**. Do not add `--display_data=true` unless you have a real display.
+
+---
+
+## Path B — terminal only (no VS Code)
+
+On Windows PowerShell, from the repo root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File docker/setup.ps1
 ```
 
-The first USB share may show a Windows permission popup. Click **Yes**. After that, re-runs do not need Administrator.
+Inside the container:
 
-### Linux / macOS
+```bash
+ls -l /dev/ttyACM*
+lerobot-find-port --save follower
+lerobot-find-port --save leader
+lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower
+lerobot-calibrate --teleop.type=so101_leader  --teleop.port=/dev/ttyACM1 --teleop.id=my_leader
+lerobot-teleoperate \
+  --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower \
+  --teleop.type=so101_leader  --teleop.port=/dev/ttyACM1 --teleop.id=my_leader
+```
+
+If find-port saved different paths, **Show robot commands** (VS Code task) or:
+
+```bash
+python src/lerobot/scripts/lerobot_setup_container.py --print-commands
+```
+
+Linux / macOS host:
 
 ```bash
 bash docker/setup.sh
 ```
 
-On **macOS**, Docker Desktop cannot reliably see USB robot cables. Use Docker for training; run LeRobot on the Mac itself when you need the real arms.
-
-### After LeRobot is installed
-
-```bash
-lerobot-setup-container
-```
-
-Useful flags:
-
-```bash
-lerobot-setup-container --host-prep   # Docker + USB only; do not open a shell
-lerobot-setup-container --cpu         # force CPU image
-lerobot-setup-container --gpu         # force NVIDIA GPU image
-lerobot-setup-container -y            # no questions; keep going
-```
-
-No robot plugged in yet? Run it anyway. It will say the cables are missing and can still pull/start Docker for training. When the leader and follower motor-bus USB cables are plugged in, run the **same command again**.
+On **macOS**, Docker cannot reliably see USB robot cables. Use Docker for training; run LeRobot on the Mac itself for the real arms.
 
 ---
 
-## After the container is up
+## If something breaks
 
-Inside the container:
+| What you see | What to do |
+| --- | --- |
+| Docker is not running | Open Docker Desktop, wait until it is Running, run Setup again |
+| Python not found | Install Python 3.12 and tick **Add to PATH**, then open a **new** terminal |
+| `usbipd` missing | `winget install usbipd` |
+| Permission popup | Click **Yes**. Needed once per USB adapter |
+| Setup looks frozen | Wait. The first USB share and image download take minutes |
+| `ls` has no `ttyACM` | HOST: **Reattach robot USB to Docker**, then reopen the container |
+| find-port: no difference after unplug | You unplugged while the share dropped. Reattach, plug **both** cables in, try again |
+| `FileNotFoundError: /dev/ttyACM0` | Same as missing ttyACM. Reattach on the host |
+| Rerun / `DISPLAY is not set` | Expected in Docker. Run teleop **without** `--display_data=true` |
+| `Failed to write 'Lock' on id_=2` | Look at the **follower** motor LEDs. All steady red = retry teleop. Motor 2 dark = reseat that 3-pin cable. Blinking = overload or wrong PSU (5 V / 7.4 V vs 12 V are not interchangeable) |
+| Calibrate / teleop on Windows COM3 | Those names only work **outside** Docker. Use the Dev Container so ports are `/dev/ttyACM*` |
+| Ran Setup **inside** the container | USB setup is host-only. Reopen folder locally, run Setup, then Reopen in Container |
 
-```bash
-ls -l /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id
-lerobot-find-port
-```
-
-Unplug **one** arm when asked so you know which path is the follower and which is the leader. Then use those paths with the normal upstream commands (`lerobot-calibrate`, `lerobot-teleoperate`, `lerobot-record`, …). See the original [SO-101 guide](https://huggingface.co/docs/lerobot/so101) and [`docker/README.md`](./docker/README.md).
-
-### VS Code / Cursor
-
-1. Run `docker/setup.ps1` or `docker/setup.sh` once on the host.
-2. Command Palette → **Dev Containers: Reopen in Container**.
-
-That uses [`.devcontainer/devcontainer.json`](./.devcontainer/devcontainer.json) and [`docker/compose.yaml`](./docker/compose.yaml) so `/dev` (both serial ports) is mounted into the container.
-
-You can also use **Terminal → Run Task → Setup LeRobot (Docker + USB)**.
+Always plug each arm into the **same physical USB port** so names stay stable.
 
 ---
 
-## What you need
+## What this fork adds
 
-- [Docker Desktop](https://docs.docker.com/get-docker/) (Windows/macOS) or Docker Engine (Linux)
-- [Python 3.12+](https://www.python.org/downloads/) on the host (the Windows script tells you if PATH is missing)
-- On Windows, [usbipd-win](https://github.com/dorssel/usbipd-win/releases) (`winget install usbipd`) so USB devices can enter the Docker VM
-- Two **data** USB cables to the motor-bus boards (not a mouse, not a charge-only cable)
+Upstream LeRobot already runs in Docker. On Windows, COM ports do **not** appear inside Docker Desktop by themselves. The overlay:
 
-Always plug each arm into the **same physical USB port** so the names stay stable.
+1. Checks Docker and starts it if needed
+2. Finds motor-bus USB adapters (CH340 / CH343 / CP210 / FTDI) and ignores mice/keyboards
+3. Shares them into Docker with `usbipd` (and binds QinHeng chips to `cdc_acm` so `/dev/ttyACM*` exists)
+4. Writes `.env` / `docker/.env` with `LEROBOT_FOLLOWER_PORT` and `LEROBOT_LEADER_PORT`
+5. Opens a container that mounts `/dev` and uses this repo as `/workspaces/lerobot`
+
+VS Code / Cursor pieces (committed):
+
+- [`.vscode/tasks.json`](./.vscode/tasks.json) — Setup, Reattach, Find port, Calibrate, Teleoperate
+- [`.vscode/launch.json`](./.vscode/launch.json) — F5 debug the same commands
+- [`.vscode/extensions.json`](./.vscode/extensions.json) — Dev Containers, Docker, Python, Serial Monitor
+- [`.devcontainer/devcontainer.json`](./.devcontainer/devcontainer.json) + [`docker/compose.yaml`](./docker/compose.yaml)
+
+More Docker detail: [`docker/README.md`](./docker/README.md).
 
 ---
 
 ## Using the rest of LeRobot
 
-Everything else is upstream. Install and train the way the original project documents:
+Everything else is upstream:
 
 ```bash
-pip install lerobot
-# or from this repo:
 uv sync --locked --extra feetech
 ```
 
 [Installation](https://huggingface.co/docs/lerobot/installation) · [GitHub](https://github.com/huggingface/lerobot) · [Discord](https://discord.gg/s3KuuzsPFb)
 
-If you are contributing features back to robotics ML, send them to **huggingface/lerobot**, not this overlay repo.
+Send robotics-ML features to **huggingface/lerobot**, not this overlay repo.

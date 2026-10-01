@@ -5,17 +5,24 @@
   "workspaceFolder": "/workspaces/lerobot",
   "shutdownAction": "stopContainer",
   "remoteUser": "user_lerobot",
-  "postStartCommand": "sh -c 'echo Serial devices in this container:; ls -l /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id 2>/dev/null || echo None yet — plug in both robot USB cables and run docker/setup.ps1 (Windows) or docker/setup.sh (Linux), then reopen this container.'",
+  "postStartCommand": "sh /workspaces/lerobot/docker/container-welcome.sh",
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-python.debugpy",
         "ms-vscode.vscode-serial-monitor"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/lerobot/.venv/bin/python",
-        "python.terminal.activateEnvironment": true
+        "python.terminal.activateEnvironment": true,
+        "python.analysis.extraPaths": ["/workspaces/lerobot/src"],
+        "python.envFile": "/workspaces/lerobot/.env",
+        "terminal.integrated.cwd": "/workspaces/lerobot",
+        "terminal.integrated.env.linux": {
+          "PYTHONPATH": "/workspaces/lerobot/src"
+        }
       }
     }
   }

@@ -684,11 +684,11 @@ class SerialMotorsBus(MotorsBusBase):
             ...     # Safe operations here
             ...     pass
         """
-        self.disable_torque(motors)
+        self.disable_torque(motors, num_retry=2)
         try:
             yield
         finally:
-            self.enable_torque(motors)
+            self.enable_torque(motors, num_retry=2)
 
     def set_timeout(self, timeout_ms: int | None = None):
         """Change the packet timeout used by the SDK.

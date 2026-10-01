@@ -16,22 +16,46 @@
 
 from pathlib import Path
 
+from lerobot.scripts.lerobot_find_port import is_motor_bus_port, parse_args as parse_find_port_args
 from lerobot.scripts.lerobot_setup_container import (
     CPU_IMAGE,
     GPU_IMAGE,
     UsbDevice,
     classify_usb_device,
     container_serial_guess,
+    parse_args as parse_setup_args,
     parse_usbipd_state,
     parse_vid_pid,
     pick_image,
+    running_in_container,
+    update_env_port,
     write_env_file,
 )
+
+
+def test_is_motor_bus_port_filters_dummy_ttys():
+    assert is_motor_bus_port("/dev/ttyACM0")
+    assert is_motor_bus_port("/dev/ttyUSB1")
+    assert is_motor_bus_port("COM4")
+    assert not is_motor_bus_port("/dev/ttyS0")
+    assert not is_motor_bus_port("/dev/tty0")
+    assert not is_motor_bus_port("/dev/tty")
 
 
 def test_parse_vid_pid():
     assert parse_vid_pid(r"USB\VID_1A86&PID_7523\123") == "1a86:7523"
     assert parse_vid_pid("not-a-usb-id") == ""
+
+
+def test_classify_ch343_serial():
+    device = UsbDevice(
+        busid="2-1",
+        vid_pid="1a86:55d3",
+        description="USB-Enhanced-SERIAL CH343 (COM3)",
+        instance_id=r"USB\VID_1A86&PID_55D3\6&1",
+        attached=True,
+    )
+    assert classify_usb_device(device) == "serial"
 
 
 def test_classify_ch340_serial():
@@ -111,3 +135,38 @@ def test_write_env_file_preserves_unrelated_keys(tmp_path: Path, monkeypatch):
     assert "LEROBOT_LEADER_PORT=/dev/ttyACM1" in text
     assert "LEROBOT_IMAGE=" in text
     assert "HF_TOKEN=keep-me" in text
+    docker_env = (tmp_path / "docker" / ".env").read_text(encoding="utf-8")
+    assert "LEROBOT_FOLLOWER_PORT=/dev/ttyACM0" in docker_env
+    assert "HF_TOKEN=keep-me" in docker_env
+
+
+def test_update_env_port_writes_follower_and_leader(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("lerobot.scripts.lerobot_setup_container.repo_root", lambda: tmp_path)
+    write_env_file(tmp_path, image=CPU_IMAGE, follower="/dev/ttyACM0", leader="/dev/ttyACM1")
+    update_env_port(tmp_path, "leader", "/dev/ttyACM9")
+    text = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "LEROBOT_FOLLOWER_PORT=/dev/ttyACM0" in text
+    assert "LEROBOT_LEADER_PORT=/dev/ttyACM9" in text
+    assert (tmp_path / "docker" / ".env").read_text(encoding="utf-8") == text
+
+
+def test_find_port_save_arg():
+    assert parse_find_port_args(["--save", "follower"]).save == "follower"
+    assert parse_find_port_args([]).save is None
+
+
+def test_setup_print_commands_flag():
+    args = parse_setup_args(["--print-commands"])
+    assert args.print_commands is True
+
+
+def test_running_in_container_false_without_markers(monkeypatch):
+    monkeypatch.setattr("lerobot.scripts.lerobot_setup_container.Path.exists", lambda self: False)
+    monkeypatch.delenv("REMOTE_CONTAINERS", raising=False)
+    monkeypatch.delenv("CODESPACES", raising=False)
+    assert running_in_container() is False
+
+
+def test_running_in_container_true_with_dockerenv(monkeypatch):
+    monkeypatch.setattr("lerobot.scripts.lerobot_setup_container.Path.exists", lambda self: True)
+    assert running_in_container() is True
