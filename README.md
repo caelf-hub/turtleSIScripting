@@ -16,7 +16,8 @@ Do these on the **Windows PC** (not inside Docker):
 
 1. [Docker Desktop](https://docs.docker.com/get-docker/) — start it and wait until it says **Running**
 2. [Python 3.12+](https://www.python.org/downloads/windows/) — check **Add python.exe to PATH**
-3. [usbipd-win](https://github.com/dorssel/usbipd-win/releases) — `winget install usbipd`
+3. [usbipd-win](https://github.com/dorssel/usbipd-win/releases) — **required** on Windows. In PowerShell: `winget install usbipd`  
+   If you skip this, Ctrl+Shift+B will print **STOP HERE** and the arms will not appear in Docker.
 4. [VS Code](https://code.visualstudio.com/) or [Cursor](https://cursor.com/), then install the **Dev Containers** extension when the editor asks
 
 Plug in **both** motor-bus USB cables. Power **both** arms. Use data cables, not charge-only.
@@ -32,7 +33,7 @@ There are two different “setup” things in this repo. Use the **first**. Igno
 | **Ctrl+Shift+B** | VS Code’s default **Build** task. In this folder that task **is** **Setup LeRobot (Docker + USB)**. It runs `docker/setup.ps1` on Windows: start Docker, share the two robot USB cables, write `.env`. | **Yes. This is step 1.** Same as **Terminal → Run Task → Setup LeRobot (Docker + USB)**. |
 | **`setup.py`** | Hugging Face’s old Python *package* installer (`pip install .`). It does **not** talk to Docker or USB. | **No.** Do not run `python setup.py` for the arms. |
 
-**Order:** Ctrl+Shift+B (while still on Windows) → **Dev Containers: Reopen in Container** → Find port / Calibrate / Teleoperate **inside** the green container.
+**Order:** Install usbipd (step 3 above) → Ctrl+Shift+B (while still on Windows) → **Dev Containers: Reopen in Container** → Find port / Calibrate / Teleoperate **inside** the green container.
 
 You are on Windows until the bottom-left corner says `Dev Container: LeRobot`. Find-port and teleop will fail if you skip Reopen in Container.
 
@@ -126,8 +127,8 @@ On **macOS**, Docker cannot reliably see USB robot cables. Use Docker for traini
 | What you see | What to do |
 | --- | --- |
 | Docker is not running | Open Docker Desktop, wait until it is Running, run Setup again |
+| `usbipd is missing` or **STOP HERE** | usbipd is not installed (or this terminal cannot see it). In **Windows PowerShell**: `winget install usbipd` (or install from [usbipd-win releases](https://github.com/dorssel/usbipd-win/releases)). **Close the VS Code terminal**, then **Ctrl+Shift+B** again. Do **not** Reopen in Container until Setup prints `/dev/ttyACM0` and `/dev/ttyACM1`. |
 | Python not found | Install Python 3.12 and tick **Add to PATH**, then open a **new** terminal |
-| `usbipd` missing | `winget install usbipd` |
 | Permission popup | Click **Yes**. Needed once per USB adapter |
 | Setup looks frozen | Wait. The first USB share and image download take minutes |
 | `ls` has no `ttyACM` | HOST: **Reattach robot USB to Docker**, then reopen the container |

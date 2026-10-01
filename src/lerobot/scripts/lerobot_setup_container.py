@@ -339,11 +339,73 @@ def usbipd_bin() -> str | None:
     found = which("usbipd")
     if found:
         return found
-    if running_in_wsl():
-        windows = Path("/mnt/c/Program Files/usbipd-win/usbipd.exe")
-        if windows.is_file():
-            return str(windows)
+    extra = [
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "usbipd-win" / "usbipd.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "usbipd-win" / "usbipd.exe",
+        Path("/mnt/c/Program Files/usbipd-win/usbipd.exe"),
+    ]
+    for path in extra:
+        if path.is_file():
+            return str(path)
     return None
+
+
+def print_usbipd_stop_here() -> None:
+    say("")
+    say("STOP HERE. Do not Reopen in Container yet. The robot USB cables cannot")
+    say("enter Docker until usbipd is installed.")
+    say("")
+    say("1. Open Windows PowerShell (a new window is fine).")
+    say("2. Run:")
+    say("     winget install usbipd")
+    say("   If that fails, download the installer:")
+    say("     https://github.com/dorssel/usbipd-win/releases")
+    say("3. Close this VS Code terminal, then press Ctrl+Shift+B again.")
+    say("   You should then see a table of USB devices, not this message.")
+
+
+def try_install_usbipd() -> bool:
+    winget = which("winget")
+    if winget is None:
+        say("winget is not on PATH. Install 'App Installer' from the Microsoft Store,")
+        say("or download usbipd from https://github.com/dorssel/usbipd-win/releases")
+        return False
+    say("Installing usbipd with winget (a permission popup may appear — click Yes)...")
+    try:
+        result = run(
+            [
+                winget,
+                "install",
+                "--id",
+                "dorssel.usbipd",
+                "-e",
+                "--accept-package-agreements",
+                "--accept-source-agreements",
+            ],
+            check=False,
+            capture=False,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired) as exc:
+        say(f"winget could not install usbipd: {exc}")
+        return False
+    return result.returncode == 0
+
+
+def ensure_usbipd(*, assume_yes: bool) -> bool:
+    if usbipd_bin() is not None:
+        return True
+    say("usbipd is missing. It is required on Windows so Docker can see the robot USB cables.")
+    if assume_yes or ask("Install usbipd now with winget?", assume_yes=assume_yes, default_yes=True):
+        try_install_usbipd()
+        if usbipd_bin() is not None:
+            say("usbipd is installed.")
+            return True
+        say("usbipd still not found in this terminal (PATH may not have updated yet).")
+        print_usbipd_stop_here()
+        return False
+    print_usbipd_stop_here()
+    return False
 
 
 def list_usbipd_devices() -> list[UsbDevice]:
@@ -570,11 +632,7 @@ def choose_robot_usb_devices(connected: list[UsbDevice], *, assume_yes: bool) ->
 
 def setup_windows_usb(*, root: Path, assume_yes: bool) -> list[UsbDevice]:
     step("USB cables (Windows → Docker)")
-    if usbipd_bin() is None:
-        say("usbipd is missing. It shares USB devices with Docker on Windows.")
-        say("Install it, then re-run this command:")
-        say("  winget install usbipd")
-        say("  https://github.com/dorssel/usbipd-win/releases")
+    if not ensure_usbipd(assume_yes=assume_yes):
         return []
 
     attempts = 1 if assume_yes else 4
@@ -864,6 +922,8 @@ def main(argv: list[str] | None = None) -> int:
     host_ports: list[str] = []
     if not args.skip_usb:
         if is_windows() or running_in_wsl():
+            if not ensure_usbipd(assume_yes=assume_yes):
+                return 1
             setup_windows_usb(root=root, assume_yes=assume_yes)
             host_ports = list_host_serial_ports()
         elif is_macos():
