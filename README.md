@@ -93,6 +93,20 @@ On **macOS**, Docker cannot reliably see USB robot cables. Use Docker for traini
 
 ## If something breaks
 
+### VS Code / Cursor popups
+
+| What you see | What to do |
+| --- | --- |
+| **An environment file is configured but terminal environment injection is disabled** | Click **Enable** on the toast, or set `python.terminal.useEnvFile` to true (this repo already does). Then **close the terminal and open a new one**. That loads `.env` so `LEROBOT_FOLLOWER_PORT` / `LEROBOT_LEADER_PORT` exist in the terminal. Ignore the toast if you only use **Terminal → Run Task** (those tasks read `.env` themselves). |
+| **This workspace has extension recommendations** | Click **Install**. You need **Dev Containers**, Python, and Docker. |
+| **Do you trust the authors of the files in this folder?** | Click **Yes, I trust the authors**. Tasks and the Dev Container will not run until you do. |
+| **Restricted Mode** | Click **Manage** → trust the folder. Same as above. |
+| Offered **Reopen in WSL** | Skip it. For this repo use **Dev Containers: Reopen in Container**, not WSL. |
+| Bottom-left does **not** say `Dev Container: LeRobot` | You are still on Windows. Command Palette → **Dev Containers: Reopen in Container** before Find port / Calibrate / Teleoperate. |
+| Asking to **select a Python interpreter** | In the Dev Container pick `/lerobot/.venv/bin/python`. On Windows host, Setup only needs any Python 3.12+ on PATH. |
+
+### Docker, USB, and the arms
+
 | What you see | What to do |
 | --- | --- |
 | Docker is not running | Open Docker Desktop, wait until it is Running, run Setup again |

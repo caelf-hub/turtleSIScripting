@@ -17,6 +17,7 @@
       "settings": {
         "python.defaultInterpreterPath": "/lerobot/.venv/bin/python",
         "python.terminal.activateEnvironment": true,
+        "python.terminal.useEnvFile": true,
         "python.analysis.extraPaths": ["/workspaces/lerobot/src"],
         "python.envFile": "/workspaces/lerobot/.env",
         "terminal.integrated.cwd": "/workspaces/lerobot",
